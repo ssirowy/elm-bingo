@@ -1,25 +1,30 @@
-module Bingo exposing (main)
+module Bingo exposing (..)
 
 import Browser
 import Html exposing (Html, div, h1, text)
 import Html.Attributes exposing (class)
 import Html.Events exposing (onClick)
-import List exposing (map, member)
+import List exposing (drop, map, member, take)
 import List.Extra exposing (remove)
 import Random exposing (generate)
 import Random.List exposing (shuffle)
 
 
-type alias BingoEntry =
-    String
+type BingoTile
+    = FreeTile
+    | BingoTile String
+
+
+type alias BingoTiles =
+    List BingoTile
 
 
 type alias BingoEntries =
-    List BingoEntry
+    List String
 
 
 type alias Model =
-    { tiles : BingoEntries
+    { tiles : BingoTiles
     , selected : BingoEntries
     }
 
@@ -27,37 +32,40 @@ type alias Model =
 type Msg
     = GenerateBingoTiles
     | ShuffleEntries BingoEntries
-    | ToggleTile BingoEntry
+    | ToggleTile BingoTile
 
 
 allEntries : BingoEntries
 allEntries =
     [ "Krishna Starbucks reference"
-    , "\"You're on mute\""
+    , "Someone talks at length while muted"
     , "Richard use crab emoji"
-    , "Someone finishes their demo in < 30 seconds"
-    , "Someone takes longer than 5 minutes to complete demo"
-    , "Someone's animal shows up in frame"
+    , "A demo is less than 30 seconds"
+    , "A demo exceeds 5 minutes"
+    , "A demo exceeds 10 minutes"
+    , "An animal shows up in frame"
     , "Someone's kid shows up in frame"
     , "\"From the bottom of my heart\""
     , "Someone writes a pun in Meet chat"
     , "Someone joins 10 minutes late"
+    , "3 people are wearing Looker shirts"
     , "Someone isn't prepared to demo and is skipped"
-    , "\"Woohoo!!\""
+    , "Katie delivers a \"Woohoo!!\""
     , "\"Woohoo!!\" Anyone BUT Katie (and not you)"
     , "Someone (not you) demos from the Dashboards team"
     , "Someone (not you) demos from the Explore team"
-    , "Someone (not you) demos from the Integrated Experiences team"
-    , "Someone (not you) demos from the Discovery and Navigation team"
-    , "Someone (not you)  demos from the Mobile team"
-    , "At least 5 people are using the blurred background effect"
+    , "Someone (not you) demos from the IE team"
+    , "Someone (not you) demos from the DiscoNav team"
+    , "Someone (not you) demos from the Mobile team"
+    , "At least 5 people are using a blurred background"
     , "The demoer (not you) started at Looker in 2020"
     , "A designer demos something"
     , "Someone is visibly eating their lunch"
     , "Someone is enjoying a potent potable"
-    , "This is a demoer's first time demoing in front of group"
-    , "Demoer indicates which team they work on (e.g \"I am on the explore team\")"
+    , "Demoer's first time in front of group"
+    , "Demoer indicates which team they work on"
     , "Ronaldo shows up"
+    , "A dog barks in the background"
     , "There are more than 30 people in attendance"
     , "I am a demoer"
     , "Someone (not you) says \"performance\""
@@ -66,10 +74,10 @@ allEntries =
     , "Someone is unable to share their screen"
     , "Kevin has a demo dashboard"
     , "Someone's demo breaks"
-    , "A speaker works in the the word \"yummy\" into their demo"
-    , "A speaker works in the the word \"indubitably\" into their demo"
-    , "A speaker works in the the word \"croissant\" into their demo"
-    , "A speaker works in the the phrase \"Ninny Muggins\" into their demo"
+    , "Demoer works the word \"yummy\" into demo"
+    , "Demoer works the word \"indubitably\" into demo"
+    , "Demoer works the word \"croissant\" into demo"
+    , "Demoer works the phrase \"Ninny Muggins\" into demo"
     , "Someone who is not on the demo list demos anyway"
     , "There are more than 6 demos"
     , "There are less than 6 demos"
@@ -78,14 +86,30 @@ allEntries =
     , "Even number of demos"
     , "Odd number of demos"
     , "Todd plays a sound effect"
-    , "There's at least one technical writer in the meeting"
-    , "There's at least one quality engineer in the meeting"
+    , "\"Can you see my screen?\""
+    , "There's at least one technical writer present"
+    , "There's at least one quality engineer present"
     ]
 
 
-entries : BingoEntries -> BingoEntries
-entries =
-    List.take 25
+top24Entries : BingoEntries -> BingoEntries
+top24Entries =
+    take 24
+
+
+entriesToTiles : BingoEntries -> BingoTiles
+entriesToTiles entries =
+    let
+        top24 =
+            top24Entries entries
+
+        top12 =
+            take 12 top24
+
+        bottom12 =
+            drop 12 top24
+    in
+    map BingoTile top12 ++ [ FreeTile ] ++ map BingoTile bottom12
 
 
 initialModel : Model
@@ -113,43 +137,64 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ShuffleEntries vals ->
-            ( { model | tiles = entries vals }, Cmd.none )
+        ShuffleEntries entries ->
+            ( { model | tiles = entriesToTiles entries }, Cmd.none )
 
         ToggleTile selected ->
-            let
-                newSelected =
-                    if member selected model.selected then
-                        remove selected model.selected
+            case selected of
+                BingoTile val ->
+                    let
+                        newSelected =
+                            if member val model.selected then
+                                remove val model.selected
 
-                    else
-                        selected :: model.selected
-            in
-            ( { model | selected = newSelected }, Cmd.none )
+                            else
+                                val :: model.selected
+                    in
+                    ( { model | selected = newSelected }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         _ ->
             ( model, Cmd.none )
 
 
-bingoTileView : BingoEntries -> BingoEntry -> Html Msg
-bingoTileView selected tile =
-    div
-        [ class "bingo-tile"
-        , class
-            (if member tile selected then
-                "selected"
+freeTileView : Html Msg
+freeTileView =
+    div [ class "selected", class "bingo-tile" ] []
 
-             else
-                "unselected"
-            )
-        , onClick <| ToggleTile tile
-        ]
-        [ text tile ]
+
+bingoTileView : BingoEntries -> BingoTile -> Html Msg
+bingoTileView selected tile =
+    case tile of
+        BingoTile val ->
+            div
+                [ class "bingo-tile"
+                , class
+                    (if member val selected then
+                        "selected"
+
+                     else
+                        "unselected"
+                    )
+                , onClick <| ToggleTile tile
+                ]
+                [ text val ]
+
+        FreeTile ->
+            freeTileView
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Bingo" ]
+        [ div [ class "bingo" ]
+            [ div [ class "pink" ] [ text "B" ]
+            , div [ class "pink" ] [ text "I" ]
+            , div [ class "gray" ] [ text "N" ]
+            , div [ class "gray" ] [ text "G" ]
+            , div [ class "gray" ] [ text "O" ]
+            ]
         , div [ class "bingo-card" ] (map (bingoTileView model.selected) model.tiles)
         ]
